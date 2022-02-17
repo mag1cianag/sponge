@@ -1,5 +1,4 @@
 #include "byte_stream.hh"
-
 #include <algorithm>
 
 // Dummy implementation of a flow-controlled in-memory byte stream.
@@ -36,7 +35,7 @@ size_t ByteStream::write(const string &data) {
 string ByteStream::peek_output(const size_t len) const {
     string s;
     for (size_t i = 0; i < len && i < _buf.size(); i += 1) {
-        s.append(1, _buf[i]);
+        s += _buf[i];
     }
     return s;
 }
