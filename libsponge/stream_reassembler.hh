@@ -3,6 +3,7 @@
 
 #include "byte_stream.hh"
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <deque>
@@ -15,9 +16,11 @@ class StreamReassembler {
 
     ByteStream _output;  //!< The reassembled in-order byte stream
     size_t _capacity;    //!< The maximum number of bytes
-    size_t _expect{} ;
-    std::deque<char> _storage{}; 
-    bool _eof{};
+    std::deque<char> _storage{};
+    std::deque<bool> _bitmap{};
+    size_t _expect{};
+    size_t _size{};
+
 
   public:
     //! \brief Construct a `StreamReassembler` that will store up to `capacity` bytes.
@@ -50,8 +53,7 @@ class StreamReassembler {
     //! \brief Is the internal state empty (other than the output stream)?
     //! \returns `true` if no substrings are waiting to be assembled
     bool empty() const;
-    private:
-    void send_out();
+
 };
 
 #endif  // SPONGE_LIBSPONGE_STREAM_REASSEMBLER_HH
