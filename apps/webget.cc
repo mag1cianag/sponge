@@ -26,6 +26,7 @@ void get_URL(const string &host, const string &path) {
     do {
         cout << ss.read();
     } while (!ss.eof());
+    ss.close();
 }
 
 int main(int argc, char *argv[]) {
