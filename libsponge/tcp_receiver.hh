@@ -28,6 +28,8 @@ class TCPReceiver {
 
     size_t _base{0};
 
+    size_t _abs_seqno{};
+
   public:
     //! \brief Construct a TCP receiver
     //!

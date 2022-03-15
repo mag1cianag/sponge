@@ -83,9 +83,6 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
             _eof =true;
             _eofidx = index + data.size();
         }
-        if (_expect == _eofidx && _eof) {
-            _output.end_input();
-        }
     }
 }
 

@@ -12,7 +12,6 @@ void DUMMY_CODE(Targs &&.../* unused */) {}
 using namespace std;
 
 void TCPReceiver::segment_received(const TCPSegment &seg) {
-  static size_t abs_seqno = 0;
   if (seg.header().syn) {
     if (_synReceived) {
       // already get a syn flag , refuse others
@@ -20,14 +19,14 @@ void TCPReceiver::segment_received(const TCPSegment &seg) {
     }
     _synReceived  = true;
     _isn  = seg.header().seqno;
-    abs_seqno = 1;
+    _abs_seqno = 1;
     _base = 1;
   }else if (!_synReceived) {
     // listen state
     return;
   }else{
     //
-    abs_seqno = unwrap(seg.header().seqno, _isn, abs_seqno);
+    _abs_seqno = unwrap(seg.header().seqno, _isn, _abs_seqno);
   }
 
   if (seg.header().fin) {
@@ -39,7 +38,7 @@ void TCPReceiver::segment_received(const TCPSegment &seg) {
   }
 
 
-  _reassembler.push_substring(seg.payload().copy(), abs_seqno-1, seg.header().fin);
+  _reassembler.push_substring(seg.payload().copy(), _abs_seqno-1, seg.header().fin);
   _base = _reassembler.ack_index() + 1;
   if (_reassembler.stream_out().input_ended()) {
     // fin ocppy a seqno
