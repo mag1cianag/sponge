@@ -7,6 +7,7 @@
 #include "wrapping_integers.hh"
 
 #include <functional>
+#include <map>
 #include <queue>
 
 //! \brief The "sender" part of a TCP implementation.
@@ -17,6 +18,22 @@
 //! segments if the retransmission timer expires.
 class TCPSender {
   private:
+    int _timeout{-1};
+
+    int _timecnt{0};
+
+    std::map<size_t, TCPSegment> _outgoing_map{};
+
+    size_t _outgoing_bytes{0};
+
+    size_t _last_window_size{1};
+
+    bool _set_syn_flag{false};
+
+    bool _set_fin_flag{false};
+
+    size_t _consecutive_retransmissions_cnt{0};
+
     //! our initial sequence number, the number for our SYN.
     WrappingInt32 _isn;
 
@@ -32,29 +49,6 @@ class TCPSender {
     //! the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};
 
-    bool _syn_sent{false};
-
-    bool _fin_sent{false};
-
-    uint64_t _bytes_in_flight{0};
-
-    uint16_t _receiver_window_size{0};
-
-    uint16_t _receiver_free_space{0};
-
-    uint16_t _consecutive_retransmissions{0};
-
-    unsigned int _rto{0};
-
-    unsigned int _time_elapsed{0};
-
-    bool _timer_running{false};
-
-    std::queue<TCPSegment> _segments_outstanding{};
-
-    bool _ack_valid(uint64_t abs_ackno); 
-
-    void _send_segment(TCPSegment &seg);
   public:
     //! Initialize a TCPSender
     TCPSender(const size_t capacity = TCPConfig::DEFAULT_CAPACITY,
