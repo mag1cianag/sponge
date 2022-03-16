@@ -3,8 +3,8 @@
 
 #include "byte_stream.hh"
 
-#include <algorithm>
 #include <cstdint>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -12,18 +12,21 @@
 //! possibly overlapping) into an in-order byte stream.
 class StreamReassembler {
   private:
-    // Your code here -- add private members as necessary.
+    struct block_node {
+        size_t begin = 0;
+        size_t length = 0;
+        std::string data = "";
+        bool operator<(const block_node t) const { return begin < t.begin; }
+    };
+    std::set<block_node> _blocks{};
+    size_t _unassembled_byte{0};
+    size_t _head_index{0};
+    bool _eof_flag{false};
 
     ByteStream _output;  //!< The reassembled in-order byte stream
     size_t _capacity;    //!< The maximum number of bytes
-    std::vector<char> _storage{};
-    std::vector<bool> _bitmap{};
-    size_t _expect{};
-    size_t _size{};
-    size_t _idx{};
-    bool _eof{};
-    size_t _eofidx{};
 
+    long merge_block(block_node &,const block_node &);
   public:
     //! \brief Construct a `StreamReassembler` that will store up to `capacity` bytes.
     //! \note This capacity limits both the bytes that have been reassembled,
@@ -55,7 +58,8 @@ class StreamReassembler {
     //! \brief Is the internal state empty (other than the output stream)?
     //! \returns `true` if no substrings are waiting to be assembled
     bool empty() const;
-    size_t ack_index() const { return _expect; }
+
+    size_t ack_index();
 };
 
 #endif  // SPONGE_LIBSPONGE_STREAM_REASSEMBLER_HH

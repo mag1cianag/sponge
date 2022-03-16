@@ -11,81 +11,116 @@ using namespace std;
 template <typename... Targs>
 void DUMMY_CODE(Targs &&.../* unused */) {}
 
-StreamReassembler::StreamReassembler(const size_t capacity)
-    : _output(capacity), _capacity(capacity), _storage(capacity), _bitmap(capacity) {}
+StreamReassembler::StreamReassembler(const size_t capacity) : _output(capacity), _capacity(capacity) {
+}
+
+long StreamReassembler::merge_block(block_node &elm1, const block_node &elm2) {
+    // todo opt
+    // copy
+    block_node x, y;
+    // x < y
+    if (elm1 < elm2) {
+        x = elm1;
+        y = elm2;
+    } else {
+        x = elm2;
+        y = elm1;
+    }
+    if (x.begin + x.length < y.begin) {
+        // no intersection, couldn't merge
+        return -1;
+    } else if (x.begin + x.length >= y.begin + y.length) {
+        // overlap whole y
+        elm1 = x;
+        return y.length;
+    } else {
+        // part overlap
+        elm1.begin = x.begin;
+        // add length
+        elm1.data = x.data + y.data.substr(x.begin + x.length - y.begin);
+        elm1.length = elm1.data.length();
+        return x.begin + x.length - y.begin;
+    }
+}
 
 //! \details This function accepts a substring (aka a segment) of bytes,
 //! possibly out-of-order, from the logical stream, and assembles any newly
 //! contiguous substrings and writes them into the output stream in order.
 void StreamReassembler::push_substring(const string &data, const size_t index, const bool eof) {
-    size_t remain = _output.remaining_capacity(); if (_expect >= index) {
-        // match
-        size_t i;
-        for (i = _expect - index; i < data.size(); i++) {
-            if (_size >= remain) {
-                break;
-            }
-            _expect++;
-            if (_bitmap[_idx]) {
-                _idx += 1;
-                continue;
-            }
-            _storage[_idx] = data[i];
-            _bitmap[_idx] = true;
-            _idx++;
-            _size++;
-        }
-        if (eof) {
-            _eof = true;
-            _eofidx = index + data.size();
-        }
-        // send to output
-        while (_idx < _capacity) {
-            if (!_bitmap[_idx]) {
-                break;
-            }
-            _idx++;
-            _expect++;
-        }
-        string mess;
-        for (size_t a = 0; a < _idx; a++) {
-            mess += _storage[a];
-            _size--;
-            _bitmap[a] = false;
-        }
-        _output.write(mess);
-        for (size_t a = _idx; a < _capacity; a++) {
-            _storage[a - _idx] = _storage[a];
-            _bitmap[a - _idx] = _bitmap[a];
-        }
-        _idx = 0;
-        if (_expect == _eofidx && _eof) {
-            _output.end_input();
-        }
-    } else {
-        // cache
+    // capacity over
+    if (index >= _head_index + _output.remaining_capacity()) {
+        // equal means
+        return;
+    }
 
-        size_t start = _idx + index - _expect;
-        for (size_t i = 0; i < data.size(); i++) {
-            if (start >= remain) {
+    // handle extra substring prefix
+    block_node elm;
+    if (index + data.length() <= _head_index) {
+        // couldn't equal, because there have emtpy substring
+        // useless substr
+        goto JUDGE_EOF;
+    } else if (index < _head_index) {
+        size_t offset = _head_index - index;
+        elm.data.assign(data.begin() + offset, data.end());
+        elm.begin = index + offset;
+        elm.length = elm.data.length();
+    } else {
+        // equal
+        elm.begin = index;
+        elm.length = data.length();
+        elm.data = data;
+    }
+    _unassembled_byte += elm.length;
+
+    // merge substring
+    do {
+        // merge next
+        long merged_bytes = 0;
+        auto iter = _blocks.lower_bound(elm);
+        while (iter != _blocks.end() && (merged_bytes = merge_block(elm, *iter)) >= 0) {
+            _unassembled_byte -= merged_bytes;
+            _blocks.erase(iter);
+            iter = _blocks.lower_bound(elm);
+        }
+        // merge prev
+        if (iter == _blocks.begin()) {
+            // no prev
+            break;
+        }
+        iter--;
+        while ((merged_bytes = merge_block(elm, *iter)) >= 0) {
+            _unassembled_byte -= merged_bytes;
+            _blocks.erase(iter);
+            iter = _blocks.lower_bound(elm);
+            if (iter == _blocks.begin()) {
                 break;
             }
-            if (_bitmap[start]) {
-                start += 1;
-                continue;
-            }
-            _storage[start] = data[i];
-            _bitmap[start] = true;
-            start++;
-            _size++;
+            iter--;
         }
-        if (eof) {
-            _eof =true;
-            _eofidx = index + data.size();
-        }
+     } while (false);
+    _blocks.insert(elm);
+
+    // write to ByteStream
+    if (!_blocks.empty() && _blocks.begin()->begin == _head_index) {
+        const block_node head_block = *_blocks.begin();
+        // modify _head_index and _unassembled_byte according to successful write to _output
+        size_t write_bytes = _output.write(head_block.data);
+        _head_index += write_bytes;
+        _unassembled_byte -= write_bytes;
+        _blocks.erase(_blocks.begin());
+    }
+
+JUDGE_EOF:
+    if (eof) {
+        _eof_flag = true;
+    }
+    if (_eof_flag && empty()) {
+        _output.end_input();
     }
 }
 
-size_t StreamReassembler::unassembled_bytes() const { return _size; }
+size_t StreamReassembler::unassembled_bytes() const { return _unassembled_byte; }
 
-bool StreamReassembler::empty() const { return _size == 0; }
+bool StreamReassembler::empty() const { return _unassembled_byte == 0; }
+
+size_t StreamReassembler::ack_index() { return _head_index; }

@@ -17,6 +17,10 @@ using namespace std;
 ByteStream::ByteStream(const size_t capacity) : _capacity(capacity) {}
 
 size_t ByteStream::write(const string &data) {
+    if (_input_ended_flag) {
+        return 0;
+    }
+
     size_t len = std::min(data.length(), remaining_capacity());
     _write_count += len;
     for (size_t i = 0; i < len; i++) {
@@ -28,7 +32,7 @@ size_t ByteStream::write(const string &data) {
 //! \param[in] len bytes will be copied from the output side of the buffer
 string ByteStream::peek_output(const size_t len) const {
     size_t length = std::min(len, buffer_size());
-    return string().assign(_buffer.begin(), _buffer.begin() + length);
+    return string(_buffer.begin(), _buffer.begin() + length);
 }
 
 //! \param[in] len bytes will be removed from the output side of the buffer
@@ -45,9 +49,6 @@ void ByteStream::pop_output(const size_t len) {
 //! \param[in] len bytes will be popped and returned
 //! \returns a string
 std::string ByteStream::read(const size_t len) {
-    if (this->eof()) {
-        return {};
-    }
     string s = peek_output(len);
     pop_output(len);
     return s;
@@ -61,10 +62,10 @@ size_t ByteStream::buffer_size() const { return _buffer.size(); }
 
 bool ByteStream::buffer_empty() const { return _buffer.empty(); }
 
-bool ByteStream::eof() const { return this->input_ended() && this->buffer_empty(); }
+bool ByteStream::eof() const { return _input_ended_flag && _buffer.empty(); }
 
 size_t ByteStream::bytes_written() const { return _write_count; }
 
 size_t ByteStream::bytes_read() const { return _read_count; }
 
-size_t ByteStream::remaining_capacity() const { return _capacity - buffer_size(); }
+size_t ByteStream::remaining_capacity() const { return _capacity - _buffer.size(); }
